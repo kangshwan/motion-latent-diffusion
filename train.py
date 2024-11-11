@@ -18,6 +18,8 @@ from mld.utils.logger import create_logger
 def main():
     # parse options
     cfg = parse_args()  # parse config file
+    # parse_args에서 거의 대부분을 다 load해둔다. 내부 체크 2024.11.11 / 15:44
+    
 
     # create logger
     logger = create_logger(cfg, phase="train")
@@ -88,7 +90,7 @@ def main():
         cfg.TRAIN.DATASETS)))
 
     # create model
-    model = get_model(cfg, datasets[0])
+    model = get_model(cfg, datasets[0]) # VAE를 학습하는 경우,,?
     logger.info("model {} loaded".format(cfg.model.model_type))
 
     # optimizer
@@ -143,10 +145,10 @@ def main():
     # trainer
     trainer = pl.Trainer(
         benchmark=False,
-        max_epochs=cfg.TRAIN.END_EPOCH,
-        accelerator=cfg.ACCELERATOR,
-        devices=cfg.DEVICE,
-        strategy=ddp_strategy,
+        max_epochs=cfg.TRAIN.END_EPOCH, # 6000 -> 6K in VAE, 3K in Diffusion Model(Paper), 2K in default yaml
+        accelerator=cfg.ACCELERATOR,    # gpu default
+        devices=cfg.DEVICE,             # [0] default
+        strategy=ddp_strategy,          
         # move_metrics_to_cpu=True,
         default_root_dir=cfg.FOLDER_EXP,
         log_every_n_steps=cfg.LOGGER.VAL_EVERY_STEPS,
@@ -162,7 +164,7 @@ def main():
     vae_type = cfg.model.motion_vae.target.split(".")[-1].lower().replace(
         "vae", "")
     # strict load vae model
-    if cfg.TRAIN.PRETRAINED_VAE:
+    if cfg.TRAIN.PRETRAINED_VAE:    # VAE 있을 때
         logger.info("Loading pretrain vae from {}".format(
             cfg.TRAIN.PRETRAINED_VAE))
         state_dict = torch.load(cfg.TRAIN.PRETRAINED_VAE,
@@ -176,7 +178,7 @@ def main():
                 vae_dict[name] = v
         model.vae.load_state_dict(vae_dict, strict=True)
 
-    if cfg.TRAIN.PRETRAINED:
+    if cfg.TRAIN.PRETRAINED:    # Pretrained Model이 있을 때..
         logger.info("Loading pretrain mode from {}".format(
             cfg.TRAIN.PRETRAINED))
         logger.info("Attention! VAE will be recovered")

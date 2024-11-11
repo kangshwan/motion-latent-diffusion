@@ -157,10 +157,14 @@ def parse_args(phase="train"):
     # params = {key: val for key, val in vars(opt).items() if val is not None}
 
     # update config from files
-    cfg_base = OmegaConf.load('./configs/base.yaml')
-    cfg_exp = OmegaConf.merge(cfg_base, OmegaConf.load(params.cfg))
-    cfg_model = get_module_config(cfg_exp.model, cfg_exp.model.target)
-    cfg_assets = OmegaConf.load(params.cfg_assets)
+    cfg_base = OmegaConf.load('./configs/base.yaml')                    # 기본 yaml 로드
+    cfg_exp = OmegaConf.merge(cfg_base, OmegaConf.load(params.cfg))     # configs/config_vae_humanml3d.yaml OR configs/config_mld_humanml3d.yaml
+    cfg_model = get_module_config(cfg_exp.model, cfg_exp.model.target)  # cfg_exp.model.target == 'modules',
+                                                                        # './configs/modules/'에 있는 yaml file 모두 load
+                                                                        # cfg_exp.model에 모두 추가해 cfg_model
+                                                                        # cfg_exp.model.motion_vae, cfg_exp.model.scheduler 등 추가됨
+                                                                        
+    cfg_assets = OmegaConf.load(params.cfg_assets)                      # configs/assets.yaml load
     cfg = OmegaConf.merge(cfg_exp, cfg_model, cfg_assets)
 
     if phase in ["train", "test"]:
