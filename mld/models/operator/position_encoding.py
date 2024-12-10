@@ -152,6 +152,7 @@ class PositionEmbeddingLearned1D(nn.Module):
 
     def forward(self, x):
         # not used in the final model
+        # 
         if self.batch_first:
             pos = self.pe.permute(1, 0, 2)[:, :x.shape[1], :]
         else:
@@ -160,8 +161,8 @@ class PositionEmbeddingLearned1D(nn.Module):
         # return self.dropout(x)
 
 
-def build_position_encoding(N_steps,
-                            position_embedding="sine",
+def build_position_encoding(N_steps,                    # 256
+                            position_embedding="sine",  # learned
                             embedding_dim="1D"):
     # N_steps = hidden_dim // 2
     if embedding_dim == "1D":

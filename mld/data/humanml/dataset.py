@@ -82,8 +82,7 @@ class Text2MotionDatasetV2(data.Dataset):
                 break
             try:
                 motion = np.load(pjoin(motion_dir, name + ".npy"))
-                if (len(motion)) < self.min_motion_length or (len(motion) >=
-                                                              200):
+                if (len(motion)) < self.min_motion_length or (len(motion) >= 200):
                     bad_count += 1
                     continue
                 text_data = []
@@ -106,11 +105,8 @@ class Text2MotionDatasetV2(data.Dataset):
                             text_data.append(text_dict)
                         else:
                             try:
-                                n_motion = motion[int(f_tag * 20):int(to_tag *
-                                                                      20)]
-                                if (len(n_motion)
-                                    ) < self.min_motion_length or (
-                                        (len(n_motion) >= 200)):
+                                n_motion = motion[int(f_tag * 20):int(to_tag * 20)]
+                                if (len(n_motion)) < self.min_motion_length or (len(n_motion) >= 200):
                                     continue
                                 new_name = (
                                     random.choice("ABCDEFGHIJKLMNOPQRSTUVW") +

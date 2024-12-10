@@ -152,7 +152,7 @@ def main():
     logger.info("model {} loaded".format(cfg.model.model_type))
     model.sample_mean = cfg.TEST.MEAN
     model.fact = cfg.TEST.FACT
-    model.to(device)
+    model.to('cpu')
     model.eval()
 
     mld_time = time.time()
@@ -166,15 +166,19 @@ def main():
         if text:
             # prepare batch data
             batch = {"length": length, "text": text}
-            
+            print(batch)
             for rep in range(cfg.DEMO.REPLICATION):
                 # text motion transfer
-                if cfg.DEMO.MOTION_TRANSFER:
+                # print(cfg.DEMO.MOTION_TRANSFER)
+                if cfg.DEMO.MOTION_TRANSFER:    # False
                     joints = model.forward_motion_style_transfer(batch)
                 # text to motion synthesis
                 else:
                     joints = model(batch)
-
+                print(len(joints))
+                print(joints[0].shape)
+                print(joints[1].shape)
+                print(joints[2].shape)
                 # cal inference time
                 infer_time = time.time() - mld_time
                 num_batch = 1

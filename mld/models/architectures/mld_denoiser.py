@@ -39,14 +39,14 @@ class MldDenoiser(nn.Module):
 
         super().__init__()
 
-        self.latent_dim = latent_dim[-1]
-        self.text_encoded_dim = text_encoded_dim
-        self.condition = condition
-        self.abl_plus = False
-        self.ablation_skip_connection = ablation.SKIP_CONNECT
-        self.diffusion_only = ablation.VAE_TYPE == "no"
-        self.arch = arch
-        self.pe_type = ablation.DIFF_PE_TYPE
+        self.latent_dim = latent_dim[-1]                        # 256
+        self.text_encoded_dim = text_encoded_dim                # 768
+        self.condition = condition                              # text
+        self.abl_plus = False                                   # False
+        self.ablation_skip_connection = ablation.SKIP_CONNECT   # True
+        self.diffusion_only = ablation.VAE_TYPE == "no"         # False
+        self.arch = arch                                        # trans_enc
+        self.pe_type = ablation.DIFF_PE_TYPE                    # mld
 
         if self.diffusion_only:
             # assert self.arch == "trans_enc", "only implement encoder for diffusion-only"

@@ -164,7 +164,7 @@ def parse_args(phase="train"):
                                                                         # cfg_exp.model에 모두 추가해 cfg_model
                                                                         # cfg_exp.model.motion_vae, cfg_exp.model.scheduler 등 추가됨
                                                                         
-    cfg_assets = OmegaConf.load(params.cfg_assets)                      # configs/assets.yaml load
+    cfg_assets = OmegaConf.load(params.cfg_assets)                      # configs/assets.yaml load, 이때 DATASET 등 경로 정보 합쳐짐
     cfg = OmegaConf.merge(cfg_exp, cfg_model, cfg_assets)
 
     if phase in ["train", "test"]:

@@ -20,12 +20,14 @@ class HumanML3DDataModule(BASEDataModule):
         super().__init__(batch_size=batch_size,
                          num_workers=num_workers,
                          collate_fn=collate_fn)
-        self.save_hyperparameters(logger=False)
+        self.save_hyperparameters(logger=False) # self.hparam 만들어짐.
+                                                # __init__에 전달된 인자를 자동으로 hparam에 저장.
         self.name = "humanml3d"
         self.njoints = 22
         if phase == "text_only":
             self.Dataset = TextOnlyDataset
         else:
+            # 여기서 class를 다
             self.Dataset = Text2MotionDatasetV2
         self.cfg = cfg
         sample_overrides = {
@@ -39,6 +41,7 @@ class HumanML3DDataModule(BASEDataModule):
         # self.transforms = self._sample_set.transforms
 
     def feats2joints(self, features):
+        # features가 vae를 통과했기 때문에, 평균과 분산을 곱해 원래 데이터 공간으로 매핑하는 과정이다!
         mean = torch.tensor(self.hparams.mean).to(features)
         std = torch.tensor(self.hparams.std).to(features)
         features = features * std + mean

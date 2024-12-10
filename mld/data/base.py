@@ -34,6 +34,9 @@ class BASEDataModule(pl.LightningDataModule):
             eval(f"self.cfg.DATASET.{self.name.upper()}.SPLIT_ROOT"),
             self.cfg.EVAL.SPLIT + ".txt",
         )
+        # sample_params가 인자들을 다 넘겨주는것으로 보인다.
+        # self.hparams에서부터 전체적인 parameter를 다 받아온다!
+        # BaseDataModule을 상속받고 있는 Text2MotionDatasetV2에서 self.Dataset을 지정해줬다!
         return self.Dataset(split_file=split_file, **sample_params)
 
     def __getattr__(self, item):

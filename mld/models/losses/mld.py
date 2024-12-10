@@ -29,7 +29,8 @@ class MLDLosses(Metric):
         if self.stage in ['diffusion', 'vae_diffusion']:
             # instance noise loss
             losses.append("inst_loss")
-            losses.append("x_loss")
+            if not self.predict_epsilon:
+                losses.append("x_loss")
             if self.cfg.LOSS.LAMBDA_PRIOR != 0.0:
                 # prior noise loss
                 losses.append("prior_loss")
@@ -106,6 +107,7 @@ class MLDLosses(Metric):
 
         if self.stage in ["diffusion", "vae_diffusion"]:
             # predict noise
+            # self.predict_epsilon == True
             if self.predict_epsilon:
                 total += self._update_loss("inst_loss", rs_set['noise_pred'],
                                            rs_set['noise'])
@@ -127,7 +129,7 @@ class MLDLosses(Metric):
             total += self._update_loss("gen_joints", rs_set['gen_joints_rst'],
                                        rs_set['joints_ref'])
 
-        self.total += total.detach()
+        self.total += total.detach()    # self.total에 그래프 연결 없이 값을 저장하기 위해 detach 사용
         self.count += 1
 
         return total

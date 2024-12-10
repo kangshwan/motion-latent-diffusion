@@ -289,8 +289,7 @@ class Text2MotionDatasetV2(data.Dataset):
                 break
             try:
                 motion = np.load(pjoin(motion_dir, name + ".npy"))
-                if (len(motion)) < self.min_motion_length or (len(motion) >=
-                                                              200):
+                if (len(motion)) < self.min_motion_length or (len(motion) >=200):
                     bad_count += 1
                     continue
                 text_data = []
@@ -313,8 +312,7 @@ class Text2MotionDatasetV2(data.Dataset):
                             text_data.append(text_dict)
                         else:
                             try:
-                                n_motion = motion[int(f_tag * 20):int(to_tag *
-                                                                      20)]
+                                n_motion = motion[int(f_tag * 20):int(to_tag * 20)]
                                 if (len(n_motion)
                                     ) < self.min_motion_length or (
                                         (len(n_motion) >= 200)):
@@ -353,9 +351,8 @@ class Text2MotionDatasetV2(data.Dataset):
                     # print(name)
             except:
                 pass
-
-        name_list, length_list = zip(
-            *sorted(zip(new_name_list, length_list), key=lambda x: x[1]))
+        print(new_name_list, length_list)
+        name_list, length_list = zip(*sorted(zip(new_name_list, length_list), key=lambda x: x[1]))
 
         self.mean = mean
         self.std = std
@@ -380,8 +377,7 @@ class Text2MotionDatasetV2(data.Dataset):
     def __getitem__(self, item):
         idx = self.pointer + item
         data = self.data_dict[self.name_list[idx]]
-        motion, m_length, text_list = data["motion"], data["length"], data[
-            "text"]
+        motion, m_length, text_list = data["motion"], data["length"], data["text"]
         # Randomly select a caption
         text_data = random.choice(text_list)
         caption, tokens = text_data["caption"], text_data["tokens"]

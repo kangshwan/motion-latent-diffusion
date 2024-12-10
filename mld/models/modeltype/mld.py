@@ -35,10 +35,11 @@ class MLD(BaseModel):
 
         self.cfg = cfg
 
-        self.stage = cfg.TRAIN.STAGE
-        self.condition = cfg.model.condition
-        self.is_vae = cfg.model.vae
-        self.predict_epsilon = cfg.TRAIN.ABLATION.PREDICT_EPSILON
+        self.stage = cfg.TRAIN.STAGE                                # vae, diffudion, vae_diffusion, 아마 test할 때 TRAIN.STAGE가 vae_diffusion이 될 듯
+        self.condition = cfg.model.condition                        # text default
+        self.is_vae = cfg.model.vae                                 # True default
+        self.predict_epsilon = cfg.TRAIN.ABLATION.PREDICT_EPSILON   # True -- noise or motion이라고 적혀있는데, MDM처럼 다음 motion을 생성하는 건지, noise를 생성하는 건지 결정할 수 있어보임.
+                                                                    # BUT True가 noise인지, motion인지 모르겠음. eplison이기 때문에 우선은 noise로 추정 (2024.11.11)
         self.nfeats = cfg.DATASET.NFEATS
         self.njoints = cfg.DATASET.NJOINTS
         self.debug = cfg.DEBUG
@@ -106,7 +107,7 @@ class MLD(BaseModel):
             for key in ["train", "test", "val"]
         }
 
-        self.metrics_dict = cfg.METRIC.TYPE
+        self.metrics_dict = cfg.METRIC.TYPE     # ['TemosMetric', 'TM2TMetrics']
         self.configure_metrics()
 
         # If we want to overide it at testing time
@@ -168,9 +169,14 @@ class MLD(BaseModel):
         # load pretrianed
         dataname = cfg.TEST.DATASETS[0]
         dataname = "t2m" if dataname == "humanml3d" else dataname
+        print("dataname: ", dataname)
+        print(os.path.join(cfg.model.t2m_path, dataname,
+                         "text_mot_match/model/finest.tar"))
         t2m_checkpoint = torch.load(
             os.path.join(cfg.model.t2m_path, dataname,
-                         "text_mot_match/model/finest.tar"))
+                         "text_mot_match/model/finest.tar"),
+                         map_location=torch.device('cpu') ) # ALERT!!!!!!강승환 - 여기 cpu로 돌릴라고 강제로 바꿈
+        # print("t2m_checkpoint:", t2m_checkpoint)
         self.t2m_textencoder.load_state_dict(t2m_checkpoint["text_encoder"])
         self.t2m_moveencoder.load_state_dict(
             t2m_checkpoint["movement_encoder"])
@@ -213,6 +219,7 @@ class MLD(BaseModel):
         z = z.unsqueeze(0)
         return z
 
+    # Predict할 때 사용
     def forward(self, batch):
         texts = batch["text"]
         lengths = batch["length"]
@@ -232,6 +239,7 @@ class MLD(BaseModel):
             z = self._diffusion_reverse(text_emb, lengths)
         elif self.stage in ['vae']:
             motions = batch['motion']
+            #                       [batch_size, nframe, 263], [batch_size]
             z, dist_m = self.vae.encode(motions, lengths)
 
         with torch.no_grad():
@@ -290,6 +298,7 @@ class MLD(BaseModel):
     def _diffusion_reverse(self, encoder_hidden_states, lengths=None):
         # init latents
         bsz = encoder_hidden_states.shape[0]
+        # True
         if self.do_classifier_free_guidance:
             bsz = bsz // 2
         if self.vae_type == "no":
@@ -301,17 +310,23 @@ class MLD(BaseModel):
             )
         else:
             latents = torch.randn(
+                # [1, 256]
+                # [2, 256]
+                # ...
+                # [7, 256]
                 (bsz, self.latent_dim[0], self.latent_dim[-1]),
                 device=encoder_hidden_states.device,
                 dtype=torch.float,
             )
 
         # scale the initial noise by the standard deviation required by the scheduler
+        # sigma(표준편차)를 곱하는 이유는 random한 noise를 scheduler가 정의한 초기 노이즈 분포와 일치시키기 위함.
+        # 예전에 diffusion process를 공부할 때, gaussian을 계속 noise에 곱해주면서 진행하는 것과 같은 맥락.
         latents = latents * self.scheduler.init_noise_sigma
         # set timesteps
         self.scheduler.set_timesteps(
             self.cfg.model.scheduler.num_inference_timesteps)
-        timesteps = self.scheduler.timesteps.to(encoder_hidden_states.device)
+        timesteps = self.scheduler.timesteps.to(encoder_hidden_states.device)# 1000
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
         # eta (η) is only used with the DDIMScheduler, and between [0, 1]
         extra_step_kwargs = {}
@@ -323,8 +338,7 @@ class MLD(BaseModel):
         for i, t in enumerate(timesteps):
             # expand the latents if we are doing classifier free guidance
             latent_model_input = (torch.cat(
-                [latents] *
-                2) if self.do_classifier_free_guidance else latents)
+                [latents] * 2) if self.do_classifier_free_guidance else latents)
             lengths_reverse = (lengths * 2 if self.do_classifier_free_guidance
                                else lengths)
             # latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
@@ -336,6 +350,7 @@ class MLD(BaseModel):
                 lengths=lengths_reverse,
             )[0]
             # perform guidance
+            # True
             if self.do_classifier_free_guidance:
                 noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                 noise_pred = noise_pred_uncond + self.guidance_scale * (
@@ -423,10 +438,12 @@ class MLD(BaseModel):
         latents_t = torch.cat(latents_t)
         return latents_t
 
+    # Only use for TRAIN
     def _diffusion_process(self, latents, encoder_hidden_states, lengths=None):
         """
         heavily from https://github.com/huggingface/diffusers/blob/main/examples/dreambooth/train_dreambooth.py
         """
+        # latent shape : [batch_size, 1+nframes, 256]
         # our latent   [batch_size, n_token=1 or 5 or 10, latent_dim=256]
         # sd  latent   [batch_size, [n_token0=64,n_token1=64], latent_dim=4]
         # [n_token, batch_size, latent_dim] -> [batch_size, n_token, latent_dim]
@@ -439,7 +456,7 @@ class MLD(BaseModel):
         # Sample a random timestep for each motion
         timesteps = torch.randint(
             0,
-            self.noise_scheduler.config.num_train_timesteps,
+            self.noise_scheduler.config.num_train_timesteps, # 1000
             (bsz, ),
             device=latents.device,
         )
@@ -473,18 +490,21 @@ class MLD(BaseModel):
             n_set["latent"] = latents
         return n_set
 
+    # VAE 학습에 사용
     def train_vae_forward(self, batch):
-        feats_ref = batch["motion"]
-        lengths = batch["length"]
+
+        # 데이터셋에서 motion과 길이 분리 -- 데이터셋을 더 자세히 봐야되네...아오 데이터시치
+        feats_ref = batch["motion"] # 원래 motion
+        lengths = batch["length"]   # 원래 길이
 
         if self.vae_type in ["mld", "vposert", "actor"]:
-            motion_z, dist_m = self.vae.encode(feats_ref, lengths)
-            feats_rst = self.vae.decode(motion_z, lengths)
+            motion_z, dist_m = self.vae.encode(feats_ref, lengths)  # latent space z
+            feats_rst = self.vae.decode(motion_z, lengths)          # z에서 복원한 motion
         else:
             raise TypeError("vae_type must be mcross or actor")
 
         # prepare for metric
-        recons_z, dist_rm = self.vae.encode(feats_rst, lengths)
+        recons_z, dist_rm = self.vae.encode(feats_rst, lengths)     # 복원한 motion을 다시 z로
 
         # joints recover
         if self.condition == "text":
@@ -507,15 +527,15 @@ class MLD(BaseModel):
         # cut longer part over max length
         min_len = min(feats_ref.shape[1], feats_rst.shape[1])
         rs_set = {
-            "m_ref": feats_ref[:, :min_len, :],
-            "m_rst": feats_rst[:, :min_len, :],
+            "m_ref": feats_ref[:, :min_len, :],             # motion reference_data
+            "m_rst": feats_rst[:, :min_len, :],             # motion reconstructed_data
             # [bs, ntoken, nfeats]<= [ntoken, bs, nfeats]
-            "lat_m": motion_z.permute(1, 0, 2),
-            "lat_rm": recons_z.permute(1, 0, 2),
-            "joints_ref": joints_ref,
-            "joints_rst": joints_rst,
-            "dist_m": dist_m,
-            "dist_ref": dist_ref,
+            "lat_m": motion_z.permute(1, 0, 2),             # latent from motion
+            "lat_rm": recons_z.permute(1, 0, 2),            # latent from reconstructed_data
+            "joints_ref": joints_ref,                       # 3D joints from motion_reference_data
+            "joints_rst": joints_rst,                       # 3D joints from motion_reconstructed_data
+            "dist_m": dist_m,                               # distribution of latent
+            "dist_ref": dist_ref,                           # distribution of centred normal distribution
         }
         return rs_set
 
@@ -525,6 +545,7 @@ class MLD(BaseModel):
         # motion encode
         with torch.no_grad():
             if self.vae_type in ["mld", "vposert", "actor"]:
+                # z.shape: [1+nframes, batch_size, 256]
                 z, dist = self.vae.encode(feats_ref, lengths)
             elif self.vae_type == "no":
                 z = feats_ref.permute(1, 0, 2)
@@ -640,18 +661,19 @@ class MLD(BaseModel):
 
         if self.stage in ['diffusion', 'vae_diffusion']:
             # diffusion reverse
-            if self.do_classifier_free_guidance:
+            if self.do_classifier_free_guidance:    # True
                 uncond_tokens = [""] * len(texts)
-                if self.condition == 'text':
+                if self.condition == 'text':    # run this
                     uncond_tokens.extend(texts)
                 elif self.condition == 'text_uncond':
                     uncond_tokens.extend(uncond_tokens)
                 texts = uncond_tokens
             text_emb = self.text_encoder(texts)
+            # z의 shape는 [1, batch_size, 256]
             z = self._diffusion_reverse(text_emb, lengths)
         elif self.stage in ['vae']:
             if self.vae_type in ["mld", "vposert", "actor"]:
-                z, dist_m = self.vae.encode(motions, lengths)
+                z, dist_m = self.vae.encode(motions, lengths)   # 사실상 decode를 위해서만 z 생성함.
             else:
                 raise TypeError("Not supported vae type!")
             if self.condition in ['text_uncond']:
@@ -668,6 +690,7 @@ class MLD(BaseModel):
         end = time.time()
         self.times.append(end - start)
 
+        # 왜 FID를 새로 만들지 않고, t2m_eval을 통했을 까?
         # joints recover
         joints_rst = self.feats2joints(feats_rst)
         joints_ref = self.feats2joints(motions)
@@ -841,18 +864,21 @@ class MLD(BaseModel):
             if self.condition in ['text', 'text_uncond']:
                 # use t2m evaluators
                 rs_set = self.t2m_eval(batch)
-            elif self.condition == 'action':
+            elif self.condition == 'action':                # text라서 안돎
                 # use a2m evaluators
                 rs_set = self.a2m_eval(batch)
             # MultiModality evaluation sperately
-            if self.trainer.datamodule.is_mm:
+            if self.trainer.datamodule.is_mm:               # is_mm False임.
                 metrics_dicts = ['MMMetrics']
             else:
-                metrics_dicts = self.metrics_dict
+                # metrics_dicts = ['TemosMetric', 'TM2TMetrics']
+                metrics_dicts = self.metrics_dict           
 
-            for metric in metrics_dicts:
+            for metric in metrics_dicts:    # metric이 TemosMetric, TM2TMetric인데, __init__의 configure_metrics()에서 
+                                            # self.TemosMetric, self.TM2TMetric으로 객체를 만들어 뒀기 때문에 
+                                            # 아래와 같이 getattr(self, metric)으로 호출이 가능하다!
                 if metric == "TemosMetric":
-                    phase = split if split != "val" else "eval"
+                    phase = split if split != "val" else "eval" # val 이면 eval, test면 test.
                     if eval(f"self.cfg.{phase.upper()}.DATASETS")[0].lower(
                     ) not in [
                             "humanml3d",
@@ -861,11 +887,12 @@ class MLD(BaseModel):
                         raise TypeError(
                             "APE and AVE metrics only support humanml3d and kit datasets now"
                         )
-
+                    # mld/models/metrics/compute.py 에 정의해둔 TemosMetric(ComputeMetrics) 객체를 사용
                     getattr(self, metric).update(rs_set["joints_rst"],
                                                  rs_set["joints_ref"],
-                                                 batch["length"])
+                                                 batch["length"]) 
                 elif metric == "TM2TMetrics":
+                    # mld/models/metrics/tm2t.py 에 정의해둔 TM2TMetrics 객체
                     getattr(self, metric).update(
                         # lat_t, latent encoded from diffusion-based text
                         # lat_rm, latent encoded from reconstructed motion

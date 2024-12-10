@@ -111,20 +111,25 @@ def main():
     model.load_state_dict(state_dict)
 
     all_metrics = {}
-    replication_times = cfg.TEST.REPLICATION_TIMES
+    replication_times = cfg.TEST.REPLICATION_TIMES  # 20
     # calculate metrics
-    for i in range(replication_times):
-        metrics_type = ", ".join(cfg.METRIC.TYPE)
+    for i in range(replication_times):  # 20회
+        metrics_type = ", ".join(cfg.METRIC.TYPE)   # ['TemosMetric', 'TM2TMetrics']
         logger.info(f"Evaluating {metrics_type} - Replication {i}")
         metrics = trainer.test(model, datamodule=datasets)[0]
         if "TM2TMetrics" in metrics_type:
             # mm meteics
             logger.info(f"Evaluating MultiModality - Replication {i}")
-            datasets.mm_mode(True)
+            datasets.mm_mode(True)  
             mm_metrics = trainer.test(model, datamodule=datasets)[0]
             metrics.update(mm_metrics)
             datasets.mm_mode(False)
+
+        # key랑 item에 대해서 출력 한번정도는 할 필요가 있어보인다.
         for key, item in metrics.items():
+            # key랑 item에 대해서 출력 한번정도는 할 필요가 있어보인다.
+            # 여기에서 출력해서 key랑 item에 대해 파악을 진행하자!!!
+            # 현재 파악 XXXXXXXXXXXXXXXXX 2024.11.20, 미완
             if key not in all_metrics:
                 all_metrics[key] = [item]
             else:

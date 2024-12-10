@@ -154,7 +154,8 @@ class TM2TMetrics(Metric):
             all_gtmotions, self.diversity_times)
 
         return {**metrics}
-
+    
+    # rs_set['lat_t'], rs_set['lat_rm'], rs_set['lat_m'], batch["length"])
     def update(
         self,
         text_embeddings: Tensor,

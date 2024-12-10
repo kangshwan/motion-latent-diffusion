@@ -32,6 +32,7 @@ def get_mean_std(phase, cfg, dataset_name):
                               "meta")
         else:
             raise ValueError("Only support t2m and kit")
+        # 아마 mean.npy, std.npy 와 아래 Mean.npy, Std.npy는 HumanML3D 데이터셋을 가져오면 생성되는것 같다.
         mean = np.load(pjoin(data_root, "mean.npy"))
         std = np.load(pjoin(data_root, "std.npy"))
     else:
@@ -76,13 +77,13 @@ motion_subdir = {"humanml3d": "new_joint_vecs", "kit": "new_joint_vecs"}
 
 def get_datasets(cfg, logger=None, phase="train"):
     # get dataset names form cfg
-    dataset_names = eval(f"cfg.{phase.upper()}.DATASETS")
+    dataset_names = eval(f"cfg.{phase.upper()}.DATASETS")                   # humanml3d
     datasets = []
     for dataset_name in dataset_names:
-        if dataset_name.lower() in ["humanml3d", "kit"]:
-            data_root = eval(f"cfg.DATASET.{dataset_name.upper()}.ROOT")
+        if dataset_name.lower() in ["humanml3d", "kit"]:                    # humanml3d default
+            data_root = eval(f"cfg.DATASET.{dataset_name.upper()}.ROOT")    # cfg.DATASET.HUMANML3D.ROOT 반환, './datasets/humanml3d'
             # get mean and std corresponding to dataset
-            mean, std = get_mean_std(phase, cfg, dataset_name)
+            mean, std = get_mean_std(phase, cfg, dataset_name)              # dataset의 mean, std값 load.
             mean_eval, std_eval = get_mean_std("val", cfg, dataset_name)
             # get WordVectorizer
             wordVectorizer = get_WordVectorizer(cfg, phase, dataset_name)
@@ -91,7 +92,7 @@ def get_datasets(cfg, logger=None, phase="train"):
             # get dataset module
             dataset = dataset_module_map[dataset_name.lower()](
                 cfg=cfg,
-                batch_size=cfg.TRAIN.BATCH_SIZE,
+                batch_size=cfg.TRAIN.BATCH_SIZE,        # 왜 1이 아니고, TRAIN_BATCH_SIZE를 썼을 까?
                 num_workers=cfg.TRAIN.NUM_WORKERS,
                 debug=cfg.DEBUG,
                 collate_fn=collate_fn,
@@ -101,7 +102,8 @@ def get_datasets(cfg, logger=None, phase="train"):
                 std_eval=std_eval,
                 w_vectorizer=wordVectorizer,
                 text_dir=pjoin(data_root, "texts"),
-                motion_dir=pjoin(data_root, motion_subdir[dataset_name]),
+                motion_dir=pjoin(data_root, motion_subdir[dataset_name]),   # data_root: './datasets/humanml3d'
+                                                                            # motion_subdir: 'new_joint_vecs'
                 max_motion_length=cfg.DATASET.SAMPLER.MAX_LEN,
                 min_motion_length=cfg.DATASET.SAMPLER.MIN_LEN,
                 max_text_len=cfg.DATASET.SAMPLER.MAX_TEXT_LEN,
@@ -137,6 +139,6 @@ def get_datasets(cfg, logger=None, phase="train"):
             raise NotImplementedError
         else:
             raise NotImplementedError
-    cfg.DATASET.NFEATS = datasets[0].nfeats
-    cfg.DATASET.NJOINTS = datasets[0].njoints
+    cfg.DATASET.NFEATS = datasets[0].nfeats         # sample에서 뽑아옴
+    cfg.DATASET.NJOINTS = datasets[0].njoints       # 22
     return datasets

@@ -39,6 +39,7 @@ class BaseModel(LightningModule):
     def predict_step(self, batch, batch_idx):
         return self.forward(batch)
 
+    # loss를 로깅하기 위함. train, validation, test의 epoch이 끝날때마다 동작함.
     def allsplit_epoch_end(self, split: str, outputs):
         dico = {}
 
@@ -46,10 +47,10 @@ class BaseModel(LightningModule):
             losses = self.losses[split]
             loss_dict = losses.compute(split)
             losses.reset()
-            dico.update({
-                losses.loss2logname(loss, split): value.item()
-                for loss, value in loss_dict.items() if not torch.isnan(value)
-            })
+        dico.update({
+            losses.loss2logname(loss, split): value.item()
+            for loss, value in loss_dict.items() if not torch.isnan(value)
+        })
 
         if split in ["val", "test"]:
             if self.trainer.datamodule.is_mm and "TM2TMetrics" in self.metrics_dict:
@@ -73,7 +74,7 @@ class BaseModel(LightningModule):
             })
         # don't write sanity check into log
         if not self.trainer.sanity_checking:
-            self.log_dict(dico, sync_dist=True, rank_zero_only=True)
+            self.log_dict(dico, sync_dist=True, rank_zero_only=True)    # log_every_n_steps의 영향을 받음
 
     def training_epoch_end(self, outputs):
         return self.allsplit_epoch_end("train", outputs)

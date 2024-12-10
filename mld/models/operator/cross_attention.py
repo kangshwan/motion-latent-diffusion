@@ -16,14 +16,15 @@ from torch import Tensor, nn
 
 
 class SkipTransformerEncoder(nn.Module):
+                    # TransformerEncoderLayer, 9, nn.LayerNorm 
     def __init__(self, encoder_layer, num_layers, norm=None):
         super().__init__()
-        self.d_model = encoder_layer.d_model
+        self.d_model = encoder_layer.d_model    # 256
 
-        self.num_layers = num_layers
+        self.num_layers = num_layers            # 9
         self.norm = norm
 
-        assert num_layers % 2 == 1
+        assert num_layers % 2 == 1  # num_layers가 홀수인지 확인
 
         num_block = (num_layers-1)//2
         self.input_blocks = _get_clones(encoder_layer, num_block)
@@ -64,14 +65,15 @@ class SkipTransformerEncoder(nn.Module):
         return x
 
 class SkipTransformerDecoder(nn.Module):
+                    # TransformerDecoderLayer, 9, nn.LayerNorm 
     def __init__(self, decoder_layer, num_layers, norm=None):
         super().__init__()
-        self.d_model = decoder_layer.d_model
+        self.d_model = decoder_layer.d_model    # 2556
         
-        self.num_layers = num_layers
+        self.num_layers = num_layers            # 9
         self.norm = norm
 
-        assert num_layers % 2 == 1
+        assert num_layers % 2 == 1  # num_layers가 홀수인지 확인
 
         num_block = (num_layers-1)//2
         self.input_blocks = _get_clones(decoder_layer, num_block)
@@ -85,7 +87,7 @@ class SkipTransformerDecoder(nn.Module):
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
-
+    # memory == z, shape: [1, bs, 256](test) or [1+nframe, bs, 256](in train VAE)
     def forward(self, tgt, memory,
                 tgt_mask: Optional[Tensor] = None,
                 memory_mask: Optional[Tensor] = None,
@@ -234,13 +236,15 @@ class TransformerDecoder(nn.Module):
 
 
 class TransformerEncoderLayer(nn.Module):
-
+    # 256, 4, 1024, 0.1, gelu, False
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False):
         super().__init__()
-        self.d_model = d_model
+        self.d_model = d_model  # 256
+                                                # 256,    4,    0.1
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         # Implementation of Feedforward model
+                                #  256,      1024
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
         self.linear2 = nn.Linear(dim_feedforward, d_model)
@@ -295,14 +299,16 @@ class TransformerEncoderLayer(nn.Module):
 
 
 class TransformerDecoderLayer(nn.Module):
-
+    # 256, 4, 1024, 0.1, gelu, False
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False):
         super().__init__()
+        self.d_model = d_model  # 256
+                                                # 256,    4,    0.1
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         self.multihead_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         # Implementation of Feedforward model
-        self.d_model = d_model
+                                #  256,      1024
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
         self.linear2 = nn.Linear(dim_feedforward, d_model)
